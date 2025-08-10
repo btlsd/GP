@@ -7,6 +7,7 @@
     body { font-family: sans-serif; background:#111; color:#eee; }
     pre  { background:#222; padding:10px; height:400px; overflow:auto; }
     button { margin-top:10px; }
+    .proper-noun { color:#0ff; }
   </style>
 </head>
 <body>
@@ -20,6 +21,7 @@
     const output = document.getElementById("output");
     const startBtn = document.getElementById("start");
     let pyodide = null;
+    let htmlBuffer = "";
 
     function formatError(err) {
       const code = err?.code || err?.name || "UnknownError";
@@ -31,15 +33,46 @@
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
+    const properNouns = { "군포": "proper-noun" };
+
+    function colorProperNouns(text) {
+      for (const [word, cls] of Object.entries(properNouns)) {
+        const spanRegex = new RegExp(`<span class="${cls}">(.*?)<\/span>`, "g");
+        text = text.replace(spanRegex, "$1");
+        const wordRegex = new RegExp(word, "g");
+        text = text.replace(wordRegex, `<span class="${cls}">${word}</span>`);
+      }
+      return text;
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    async function typeLine(line) {
+      for (const ch of line) {
+        htmlBuffer += ch;
+        output.innerHTML = colorProperNouns(htmlBuffer);
+        await sleep(50);
+      }
+      htmlBuffer += "<br>";
+      output.innerHTML = colorProperNouns(htmlBuffer);
+    }
+
     async function playOpening() {
-      const lines = [
-        "어둠이 내려앉은 도시...",
-        "소모형 인공 인간 용병이 깨어납니다...",
-        "의뢰 사무소에서 연락을 기다립니다..."
-      ];
-      for (const line of lines) {
-        output.textContent += line + "\n";
-        await sleep(1000);
+      try {
+        const res = await fetch("opening.json");
+        const lines = await res.json();
+        for (const line of lines) {
+          await typeLine(line);
+          await sleep(400);
+        }
+      } catch (err) {
+        htmlBuffer += `[오프닝 로드 실패]<br>${formatError(err)}<br>`;
+        output.innerHTML = colorProperNouns(htmlBuffer);
       }
     }
 
@@ -47,7 +80,10 @@
       try {
         pyodide = await loadPyodide();
         pyodide.registerJsModule("browser", {
-          write: (text) => (output.textContent += text)
+          write: (text) => {
+            const escaped = escapeHtml(text).replace(/\n/g, "<br>");
+            output.innerHTML += colorProperNouns(escaped);
+          }
         });
       } catch (err) {
         output.textContent += `Pyodide 초기화 실패:\n${formatError(err)}\n`;
@@ -148,11 +184,12 @@ if __name__ == "__main__":
 `;
 
     startBtn.addEventListener("click", async () => {
-      output.textContent = "=== 군포 프로젝트 ===\n";
+      output.innerHTML = colorProperNouns("=== 군포 프로젝트 ===<br>");
+      htmlBuffer = output.innerHTML;
       startBtn.disabled = true;
 
       if (!pyodide) {
-        output.textContent += "\n[오류] Pyodide가 아직 초기화되지 않았습니다.\n";
+        output.innerHTML += "<br>[오류] Pyodide가 아직 초기화되지 않았습니다.<br>";
         startBtn.disabled = false;
         return;
       }
@@ -162,7 +199,7 @@ if __name__ == "__main__":
       try {
         await pyodide.runPythonAsync(gameCode);
       } catch (err) {
-        output.textContent += `\n[에러 발생]\n${formatError(err)}\n`;
+        output.innerHTML += `<br>[에러 발생]<br>${formatError(err)}<br>`;
       }
 
       startBtn.disabled = false;
