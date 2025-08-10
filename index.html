@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>Pyodide Text RPG</title>
+  <title>군포 프로젝트</title>
   <style>
     body { font-family: sans-serif; background:#111; color:#eee; }
     pre  { background:#222; padding:10px; height:400px; overflow:auto; }
@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  <h1>Pyodide Text RPG 데모</h1>
+  <h1>군포 프로젝트</h1>
   <pre id="output"></pre>
   <button id="start">게임 시작</button>
 
@@ -21,11 +21,21 @@
     const startBtn = document.getElementById("start");
     let pyodide = null;
 
+    function formatError(err) {
+      const code = err?.code || err?.name || "UnknownError";
+      const message = err?.message || err;
+      return `[${code}] ${message}`;
+    }
+
     async function initPyodide() {
-      pyodide = await loadPyodide();
-      pyodide.registerJsModule("browser", {
-        write: (text) => output.textContent += text
-      });
+      try {
+        pyodide = await loadPyodide();
+        pyodide.registerJsModule("browser", {
+          write: (text) => (output.textContent += text)
+        });
+      } catch (err) {
+        output.textContent += `Pyodide 초기화 실패:\n${formatError(err)}\n`;
+      }
     }
     initPyodide();
 
@@ -122,8 +132,18 @@ if __name__ == "__main__":
 `;
 
     startBtn.addEventListener("click", async () => {
-      output.textContent = "";
-      await pyodide.runPythonAsync(gameCode);
+      output.textContent = "=== 군포 프로젝트 ===\n";
+
+      if (!pyodide) {
+        output.textContent += "\n[오류] Pyodide가 아직 초기화되지 않았습니다.\n";
+        return;
+      }
+
+      try {
+        await pyodide.runPythonAsync(gameCode);
+      } catch (err) {
+        output.textContent += `\n[에러 발생]\n${formatError(err)}\n`;
+      }
     });
   </script>
 </body>
