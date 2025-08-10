@@ -76,6 +76,12 @@
       }
     }
 
+    function formatError(err) {
+      const code = err?.code || err?.name || "UnknownError";
+      const message = err?.message || err;
+      return `[${code}] ${message}`;
+    }
+
     async function initPyodide() {
       try {
         pyodide = await loadPyodide();
