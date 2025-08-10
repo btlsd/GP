@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
     startBtn.addEventListener("click", async () => {
       output.textContent = "=== 군포 프로젝트 ===\n";
-
+    
       if (!pyodide) {
         output.textContent += "\n[오류] Pyodide가 아직 초기화되지 않았습니다.\n";
         return;
