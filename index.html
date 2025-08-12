@@ -70,22 +70,16 @@
           await typeLine(line);
           await sleep(400);
         }
-      } catch (err) {
-        htmlBuffer += `[오프닝 로드 실패]<br>${formatError(err)}<br>`;
-        output.innerHTML = colorProperNouns(htmlBuffer);
-      }
+    } catch (err) {
+      htmlBuffer += `[오프닝 로드 실패]<br>${formatError(err)}<br>`;
+      output.innerHTML = colorProperNouns(htmlBuffer);
     }
+  }
 
-    function formatError(err) {
-      const code = err?.code || err?.name || "UnknownError";
-      const message = err?.message || err;
-      return `[${code}] ${message}`;
-    }
-
-    async function initPyodide() {
-      try {
-        pyodide = await loadPyodide();
-        pyodide.registerJsModule("browser", {
+  async function initPyodide() {
+    try {
+      pyodide = await loadPyodide();
+      pyodide.registerJsModule("browser", {
           write: (text) => {
             const escaped = escapeHtml(text).replace(/\n/g, "<br>");
             output.innerHTML += colorProperNouns(escaped);
