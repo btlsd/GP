@@ -1,0 +1,63 @@
+{
+  "locations": {
+    "mission_office": {
+      "description": "[의뢰 사무소] 의뢰가 등록되어 있습니다.",
+      "npcs": ["단말기"],
+      "actions": ["임무 수락", "메뉴 열기"],
+      "notifications": [
+        "[단말기 알림] 새 임무가 도착했습니다.",
+        "내용: 거대 기업의 비밀 연구소 침입."
+      ],
+      "prompt": "임무를 수락하시겠습니까? (y/n): ",
+      "accept_text": "\n임무를 수락했습니다. 현장으로 이동합니다...",
+      "decline_text": "\n임무를 거부했습니다. 다른 의뢰를 기다립니다.",
+      "demo_hint": "(연습) 임무 수락 절차를 연습합니다."
+    },
+    "training_ground": {
+      "description": "[훈련장] 교관이 다가옵니다.",
+      "npcs": ["교관"],
+      "actions": ["아이템 장착", "전투 훈련", "메뉴 열기"],
+      "lines": [
+        "NPC: '기본 장비 교육을 시작한다.'",
+        "NPC: '이제 공격 훈련이다.'",
+        "NPC: '마지막으로 의뢰를 받는 방법을 익혀라.'"
+      ]
+    }
+  },
+  "combat": {
+    "start_text": "[전투 개시] 상대: {enemy}",
+    "appearance_text": "외형: {desc}",
+    "prompt_main": "행동을 선택하세요: ",
+    "prompt_sub": "세부 행동을 선택하세요: ",
+    "player_attack": "{player}의 {move}! {enemy}에게 {dmg}만큼의 피해를 입혔습니다.",
+    "player_defend": "{player}는 {move} 태세를 취했습니다.",
+    "player_skill": "{player}은(는) {move}을(를) 사용했지만 아직 효과가 없습니다.",
+    "player_item": "{player}은(는) {move}을(를) 사용했지만 아무 일도 일어나지 않았습니다.",
+    "player_escape": "당신은 도주했습니다!",
+    "player_invalid": "잘못된 입력입니다.",
+    "enemy_turn": "{enemy}의 차례!",
+    "enemy_attack": "{enemy}의 공격! {player}이 {dmg}만큼의 피해를 입었습니다.",
+    "enemy_defend": "{enemy}는 방어 태세를 취했습니다.",
+    "enemy_defeated": "{enemy}를 처치했습니다!",
+    "player_defeated": "{player}는 쓰러졌습니다...",
+    "unknown": "unknown"
+  },
+  "equipment_menu": {
+    "title": "[아이템 장착] 인벤토리:",
+    "prompt": "장착할 아이템 번호를 선택하세요: ",
+    "success": "{item}을(를) 장착했습니다.",
+    "cancel": "장착을 취소했습니다."
+  },
+  "misc": {
+    "code_name": "\n지정된 코드명: {name}",
+    "awakening": "{name}가(이) 소모형 인공 용병으로서 깨어났습니다.",
+    "waiting": "회사로부터 의뢰를 기다립니다...",
+    "mission_complete": "\n임무 완료! 보상을 받았습니다.\n의뢰 사무소로 돌아갑니다.\n",
+    "game_over": "\n[게임 종료] 당신은 더 이상 임무를 수행할 수 없습니다.",
+    "demo_complete": "연습 완료.",
+    "training_dummy_name": "훈련용 드론",
+    "training_dummy_desc": "시험용 금속 바디",
+    "mission_enemy_name": "경비 드론",
+    "mission_enemy_desc": "회색 외장과 붉은 센서를 가진 드론"
+  }
+}
