@@ -2,6 +2,7 @@ import json
 import random
 import string
 import time
+from pathlib import Path
 
 try:
     import js
@@ -26,13 +27,23 @@ def input(prompt: str = "") -> str:
         return js.prompt(prompt) or ""
     return __builtins__.input(prompt)
 
+BASE_PATH = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+
+
+def _load_json(filename: str):
+    path = BASE_PATH / filename
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError as exc:  # pragma: no cover - runtime safety
+        raise FileNotFoundError(f"Required file not found: {path}") from exc
+
+
 # Load configurable text and lists
-with open("config.json", encoding="utf-8") as f:
-    CONFIG = json.load(f)
+CONFIG = _load_json("config.json")
 
 # Load combat actions
-with open("actions.json", encoding="utf-8") as f:
-    ACTIONS = json.load(f)
+ACTIONS = _load_json("actions.json")
 
 def generate_code_name():
     letters = random.choice(string.ascii_uppercase) + random.choice(string.ascii_uppercase)
