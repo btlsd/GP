@@ -1,0 +1,27 @@
+[
+  {
+    "key": "attack",
+    "name": "공격",
+    "options": ["찌르기", "베기"]
+  },
+  {
+    "key": "defend",
+    "name": "방어",
+    "options": ["방패 올리기", "회피"]
+  },
+  {
+    "key": "skill",
+    "name": "기술",
+    "options": ["파워 어택"]
+  },
+  {
+    "key": "item",
+    "name": "물건 사용",
+    "options": ["체력 포션"]
+  },
+  {
+    "key": "escape",
+    "name": "도주",
+    "options": []
+  }
+]
