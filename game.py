@@ -1,11 +1,29 @@
-import random, time, js, string
-from browser import write
+import random
+import string
+import time
 
-def print(*args, **kwargs):
-    write(" ".join(map(str, args)) + "\\n")
+try:
+    import js
+    from browser import write
+except Exception:  # Fallback when running outside Pyodide
+    js = None
+    write = None
 
-def input(prompt=""):
-    return js.prompt(prompt) or ""
+
+def print(*args, sep=" ", end="\n", **kwargs):
+    """Custom print that works with or without the browser module."""
+    text = sep.join(map(str, args)) + end
+    if write:
+        write(text)
+    else:  # pragma: no cover - fallback for local execution
+        __builtins__.print(text, end="")
+
+
+def input(prompt: str = "") -> str:
+    """Prompt the user, falling back to standard input if needed."""
+    if js and hasattr(js, "prompt"):
+        return js.prompt(prompt) or ""
+    return __builtins__.input(prompt)
 
 def generate_code_name():
     letters = random.choice(string.ascii_uppercase) + random.choice(string.ascii_uppercase)
@@ -42,7 +60,11 @@ class Enemy:
 def equip_menu(player):
     print("\n[아이템 장착] 인벤토리:")
     for idx, item in enumerate(player.inventory, 1):
-        print(f"{idx}. {item.name} (공격 +{item.attack_bonus}, 방어 +{item.defense_bonus})")
+        msg = (
+            f"{idx}. {item.name} "
+            f"(공격 +{item.attack_bonus}, 방어 +{item.defense_bonus})"
+        )
+        print(msg)
     choice = input("장착할 아이템 번호를 선택하세요: ").strip()
     if choice.isdigit() and 1 <= int(choice) <= len(player.inventory):
         item = player.inventory[int(choice) - 1]
