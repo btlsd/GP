@@ -54,8 +54,8 @@ ACTIONS = _load_json("actions.json")
 # Load tutorial script
 TUTORIAL = _load_json("tutorial.json")
 
-# Load player state
-PLAYER_STATE = _load_json("player.json")
+# Load starting player template
+PLAYER_TEMPLATE = _load_json("player.json")
 
 def generate_code_name():
     letters = random.choice(string.ascii_uppercase) + random.choice(string.ascii_uppercase)
@@ -119,8 +119,8 @@ class Enemy:
         self.description = description
 
 
-def save_player(player):
-    _save_json("player.json", player.to_dict())
+def save_game(player, filename: str = "save.json"):
+    _save_json(filename, player.to_dict())
 
 
 def check_conditions(player, conditions):
@@ -187,7 +187,7 @@ def equip_menu(player):
         item = player.inventory[int(choice) - 1]
         player.weapon = item
         print(menu["success"].format(item=item.name))
-        save_player(player)
+        save_game(player)
     else:
         print(menu["cancel"])
 
@@ -266,7 +266,7 @@ def turn_based_combat(player, enemy):
             break
 
     player.defense = 5
-    save_player(player)
+    save_game(player)
 
 def mission_office(demo: bool = False):
     loc = CONFIG["locations"]["mission_office"]
@@ -282,6 +282,26 @@ def mission_office(demo: bool = False):
         print(CONFIG["misc"]["demo_complete"])
         return False
     return action == "y"
+
+
+def start_menu():
+    while True:
+        print("1. 새 게임")
+        print("2. 불러오기")
+        choice = input("메뉴를 선택하세요: ").strip()
+        if choice == "1":
+            player = Player(PLAYER_TEMPLATE)
+            save_game(player)
+            return player, True
+        if choice == "2":
+            try:
+                state = _load_json("save.json")
+            except FileNotFoundError:
+                print("세이브 파일이 없습니다.")
+                continue
+            player = Player(state)
+            return player, False
+        print(CONFIG["combat"]["player_invalid"])
 
 def training_session(player):
     tut = TUTORIAL
@@ -305,7 +325,7 @@ def training_session(player):
             player.inventory.append(stick)
             player.weapon = stick
             print(step.get("success", "장비를 주웠습니다."))
-            save_player(player)
+            save_game(player)
             break
         else:
             print(CONFIG["combat"]["player_invalid"])
@@ -347,19 +367,18 @@ def training_session(player):
             print(step["line"])
         if step.get("demo"):
             mission_office(demo=True)
-    save_player(player)
+    save_game(player)
 
 def main():
-    player = Player(PLAYER_STATE)
+    player, is_new = start_menu()
     misc = CONFIG["misc"]
     print(misc["code_name"].format(name=player.name))
-    if not PLAYER_STATE.get("name"):
-        save_player(player)
-    print(misc["awakening"].format(name=player.name))
-    training_session(player)
-    if player.hp <= 0:
-        print(misc["game_over"])
-        return
+    if is_new:
+        print(misc["awakening"].format(name=player.name))
+        training_session(player)
+        if player.hp <= 0:
+            print(misc["game_over"])
+            return
     print(misc["waiting"])
 
     loc = CONFIG["locations"]["mission_office"]
@@ -379,11 +398,11 @@ def main():
             else:
                 print(misc["mission_complete"])
                 player.missions["completed"] = player.missions.get("completed", 0) + 1
-                save_player(player)
+                save_game(player)
         else:
             print(loc["decline_text"])
             time.sleep(1)
-        save_player(player)
+        save_game(player)
 
 if __name__ == "__main__":
     main()
