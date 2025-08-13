@@ -2,26 +2,41 @@
   {
     "key": "attack",
     "name": "공격",
-    "options": ["찌르기", "베기"]
+    "conditions": {"weapon": true},
+    "options": [
+      {"name": "찌르기", "conditions": {"weapon": "막대기"}},
+      {"name": "베기", "conditions": {"weapon": "검"}}
+    ]
   },
   {
     "key": "defend",
     "name": "방어",
-    "options": ["방패 올리기", "회피"]
+    "conditions": {},
+    "options": [
+      {"name": "방패 올리기", "conditions": {"has_item": "방패"}},
+      {"name": "회피", "conditions": {}}
+    ]
   },
   {
     "key": "skill",
     "name": "기술",
-    "options": ["파워 어택"]
+    "conditions": {},
+    "options": [
+      {"name": "파워 어택", "conditions": {"weapon": true}}
+    ]
   },
   {
     "key": "item",
     "name": "물건 사용",
-    "options": ["체력 포션"]
+    "conditions": {"has_item": "체력 포션"},
+    "options": [
+      {"name": "체력 포션", "conditions": {"has_item": "체력 포션"}}
+    ]
   },
   {
     "key": "escape",
     "name": "도주",
+    "conditions": {},
     "options": []
   }
 ]

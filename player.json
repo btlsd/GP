@@ -1,0 +1,16 @@
+{
+  "name": "",
+  "stats": {
+    "hp": 100,
+    "base_attack": 10,
+    "defense": 5
+  },
+  "inventory": [],
+  "equipment": {
+    "weapon": null
+  },
+  "missions": {
+    "current": null,
+    "completed": 0
+  }
+}

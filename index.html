@@ -77,7 +77,7 @@
   }
 
   async function preloadFiles() {
-    const files = ["config.json", "actions.json"];
+    const files = ["config.json", "actions.json", "tutorial.json", "player.json"];
     for (const file of files) {
       try {
         const text = await (await fetch(file)).text();
