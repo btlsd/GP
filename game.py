@@ -39,11 +39,23 @@ def _load_json(filename: str):
         raise FileNotFoundError(f"Required file not found: {path}") from exc
 
 
+def _save_json(filename: str, data):
+    path = BASE_PATH / filename
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 # Load configurable text and lists
 CONFIG = _load_json("config.json")
 
 # Load combat actions
 ACTIONS = _load_json("actions.json")
+
+# Load tutorial script
+TUTORIAL = _load_json("tutorial.json")
+
+# Load starting player template
+PLAYER_TEMPLATE = _load_json("player.json")
 
 def generate_code_name():
     letters = random.choice(string.ascii_uppercase) + random.choice(string.ascii_uppercase)
@@ -57,18 +69,46 @@ class Item:
         self.defense_bonus = defense_bonus
 
 class Player:
-    def __init__(self, name):
-        self.name = name
-        self.hp = 100
-        self.base_attack = 10
-        self.defense = 5
-        self.inventory = [Item("훈련용 블레이드", attack_bonus=5)]
-        self.weapon = None
+    def __init__(self, state):
+        self.name = state.get("name") or generate_code_name()
+        stats = state.get("stats", {})
+        self.hp = stats.get("hp", 100)
+        self.base_attack = stats.get("base_attack", 10)
+        self.defense = stats.get("defense", 5)
+        self.inventory = [
+            Item(i["name"], i.get("attack_bonus", 0), i.get("defense_bonus", 0))
+            for i in state.get("inventory", [])
+        ]
+        weapon_name = state.get("equipment", {}).get("weapon")
+        self.weapon = next(
+            (item for item in self.inventory if item.name == weapon_name), None
+        )
+        self.missions = state.get("missions", {})
 
     @property
     def attack(self):
         bonus = self.weapon.attack_bonus if self.weapon else 0
         return self.base_attack + bonus
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "stats": {
+                "hp": self.hp,
+                "base_attack": self.base_attack,
+                "defense": self.defense,
+            },
+            "inventory": [
+                {
+                    "name": i.name,
+                    "attack_bonus": i.attack_bonus,
+                    "defense_bonus": i.defense_bonus,
+                }
+                for i in self.inventory
+            ],
+            "equipment": {"weapon": self.weapon.name if self.weapon else None},
+            "missions": self.missions,
+        }
 
 class Enemy:
     def __init__(self, name, hp, attack, defense, description=""):
@@ -79,18 +119,58 @@ class Enemy:
         self.description = description
 
 
-def show_location(key: str):
+def save_game(player, filename: str = "save.json"):
+    _save_json(filename, player.to_dict())
+
+
+def check_conditions(player, conditions):
+    for key, value in conditions.items():
+        if key == "weapon":
+            if value is True and not player.weapon:
+                return False
+            if isinstance(value, str):
+                if not player.weapon or player.weapon.name != value:
+                    return False
+        elif key == "has_item":
+            if not any(item.name == value for item in player.inventory):
+                return False
+        elif key == "mission":
+            if player.missions.get("current") != value:
+                return False
+        else:
+            return False
+    return True
+
+
+def get_available_actions(player):
+    available = []
+    for cat in ACTIONS:
+        if not check_conditions(player, cat.get("conditions", {})):
+            continue
+        opts = []
+        for opt in cat.get("options", []):
+            if check_conditions(player, opt.get("conditions", {})):
+                opts.append(opt)
+        if opts or not cat.get("options"):
+            new_cat = dict(cat)
+            new_cat["options"] = opts
+            available.append(new_cat)
+    return available
+
+
+def show_location(key: str, npcs_override=None, actions_override=None):
     loc = CONFIG["locations"][key]
     print(f"\n{loc['description']}")
-    npcs = loc.get("npcs", [])
+    npcs = npcs_override if npcs_override is not None else loc.get("npcs", [])
     if npcs:
         print("NPC 목록:")
         for npc in npcs:
             print(f" - {npc}")
     else:
         print("NPC 없음")
+    actions = actions_override if actions_override is not None else loc.get("actions", [])
     print("가능한 행동:")
-    for idx, action in enumerate(loc.get("actions", []), 1):
+    for idx, action in enumerate(actions, 1):
         print(f"{idx}. {action}")
 
 def equip_menu(player):
@@ -107,6 +187,7 @@ def equip_menu(player):
         item = player.inventory[int(choice) - 1]
         player.weapon = item
         print(menu["success"].format(item=item.name))
+        save_game(player)
     else:
         print(menu["cancel"])
 
@@ -118,24 +199,26 @@ def turn_based_combat(player, enemy):
         print(cfg["appearance_text"].format(desc=enemy.description))
     while player.hp > 0 and enemy.hp > 0:
         print(f"\n{player.name} HP: {player.hp}, {enemy_name} HP: {enemy.hp}")
+        available = get_available_actions(player)
         print("가능한 행동:")
-        for i, act in enumerate(ACTIONS, 1):
+        for i, act in enumerate(available, 1):
             print(f"{i}. {act['name']}")
         action_choice = input(cfg["prompt_main"]).strip()
-        if not action_choice.isdigit() or not (1 <= int(action_choice) <= len(ACTIONS)):
+        if not action_choice.isdigit() or not (1 <= int(action_choice) <= len(available)):
             print(cfg["player_invalid"])
             continue
-        category = ACTIONS[int(action_choice) - 1]
+        category = available[int(action_choice) - 1]
         subactions = category.get("options", [])
         move_name = category["name"]
         if subactions:
             for i, move in enumerate(subactions, 1):
-                print(f"{i}. {move}")
+                print(f"{i}. {move['name']}")
             move_choice = input(cfg["prompt_sub"]).strip()
             if not move_choice.isdigit() or not (1 <= int(move_choice) <= len(subactions)):
                 print(cfg["player_invalid"])
                 continue
-            move_name = subactions[int(move_choice) - 1]
+            move = subactions[int(move_choice) - 1]
+            move_name = move["name"]
 
         key = category["key"]
         if key == "attack":
@@ -183,6 +266,7 @@ def turn_based_combat(player, enemy):
             break
 
     player.defense = 5
+    save_game(player)
 
 def mission_office(demo: bool = False):
     loc = CONFIG["locations"]["mission_office"]
@@ -199,34 +283,102 @@ def mission_office(demo: bool = False):
         return False
     return action == "y"
 
+
+def start_menu():
+    while True:
+        print("1. 새 게임")
+        print("2. 불러오기")
+        choice = input("메뉴를 선택하세요: ").strip()
+        if choice == "1":
+            player = Player(PLAYER_TEMPLATE)
+            save_game(player)
+            return player, True
+        if choice == "2":
+            try:
+                state = _load_json("save.json")
+            except FileNotFoundError:
+                print("세이브 파일이 없습니다.")
+                continue
+            player = Player(state)
+            return player, False
+        print(CONFIG["combat"]["player_invalid"])
+
 def training_session(player):
-    loc = CONFIG["locations"]["training_ground"]
-    show_location("training_ground")
-    print(loc["lines"][0])
-    equip_menu(player)
-    print(loc["lines"][1])
-    dummy = Enemy(
-        CONFIG["misc"]["training_dummy_name"],
-        30,
-        5,
-        2,
-        CONFIG["misc"]["training_dummy_desc"],
+    tut = TUTORIAL
+    stick_cfg = tut.get("stick_item", {})
+    stick = Item(
+        stick_cfg.get("name", "막대기"),
+        attack_bonus=stick_cfg.get("attack_bonus", 0),
+        defense_bonus=stick_cfg.get("defense_bonus", 0),
     )
-    turn_based_combat(player, dummy)
-    if player.hp > 0:
-        print(loc["lines"][2])
-        mission_office(demo=True)
+
+    steps = tut.get("steps", [])
+
+    # Step 0: stick pickup
+    step = steps[0]
+    while True:
+        show_location("training_ground", actions_override=step.get("actions", []))
+        if step.get("line"):
+            print(step["line"])
+        action = input("행동을 선택하세요: ").strip()
+        if action in step.get("actions", []):
+            player.inventory.append(stick)
+            player.weapon = stick
+            print(step.get("success", "장비를 주웠습니다."))
+            save_game(player)
+            break
+        else:
+            print(CONFIG["combat"]["player_invalid"])
+
+    # Step 1: choose instructor or menu
+    step = steps[1]
+    while True:
+        show_location("training_ground", actions_override=step.get("actions", []))
+        if step.get("info"):
+            print(step["info"])
+        if step.get("line"):
+            print(step["line"])
+        choice = input("행동을 선택하세요: ").strip()
+        if choice == "교관":
+            break
+        elif choice == "메뉴":
+            equip_menu(player)
+        else:
+            print(CONFIG["combat"]["player_invalid"])
+
+    # Step 2: interaction (combat or menu)
+    step = steps[2]
+    while True:
+        show_location("training_ground", actions_override=step.get("actions", []))
+        interaction = input("상호작용을 선택하세요: ").strip()
+        if interaction == "전투":
+            enemy = Enemy("교관", 30, 5, 2, "훈련 교관")
+            turn_based_combat(player, enemy)
+            break
+        elif interaction == "메뉴":
+            equip_menu(player)
+        else:
+            print(CONFIG["combat"]["player_invalid"])
+
+    # Step 3: conclude tutorial
+    if player.hp > 0 and len(steps) > 3:
+        step = steps[3]
+        if step.get("line"):
+            print(step["line"])
+        if step.get("demo"):
+            mission_office(demo=True)
+    save_game(player)
 
 def main():
-    player_name = generate_code_name()
-    player = Player(player_name)
+    player, is_new = start_menu()
     misc = CONFIG["misc"]
     print(misc["code_name"].format(name=player.name))
-    print(misc["awakening"].format(name=player.name))
-    training_session(player)
-    if player.hp <= 0:
-        print(misc["game_over"])
-        return
+    if is_new:
+        print(misc["awakening"].format(name=player.name))
+        training_session(player)
+        if player.hp <= 0:
+            print(misc["game_over"])
+            return
     print(misc["waiting"])
 
     loc = CONFIG["locations"]["mission_office"]
@@ -245,9 +397,12 @@ def main():
                 print(misc["game_over"])
             else:
                 print(misc["mission_complete"])
+                player.missions["completed"] = player.missions.get("completed", 0) + 1
+                save_game(player)
         else:
             print(loc["decline_text"])
             time.sleep(1)
+        save_game(player)
 
 if __name__ == "__main__":
     main()

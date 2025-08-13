@@ -77,10 +77,12 @@
   }
 
   async function preloadFiles() {
-    const files = ["config.json", "actions.json"];
+    const files = ["config.json", "actions.json", "tutorial.json", "player.json", "save.json"];
     for (const file of files) {
       try {
-        const text = await (await fetch(file)).text();
+        const res = await fetch(file);
+        if (!res.ok) continue;
+        const text = await res.text();
         pyodide.FS.writeFile(`/home/pyodide/${file}`, new TextEncoder().encode(text));
       } catch (err) {
         output.innerHTML += `<br>[파일 로드 실패] ${file}<br>${formatError(err)}<br>`;
