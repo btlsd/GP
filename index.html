@@ -76,6 +76,18 @@
     }
   }
 
+  async function preloadFiles() {
+    const files = ["config.json", "actions.json"];
+    for (const file of files) {
+      try {
+        const text = await (await fetch(file)).text();
+        pyodide.FS.writeFile(`/home/pyodide/${file}`, new TextEncoder().encode(text));
+      } catch (err) {
+        output.innerHTML += `<br>[파일 로드 실패] ${file}<br>${formatError(err)}<br>`;
+      }
+    }
+  }
+
   async function initPyodide() {
     try {
       pyodide = await loadPyodide();
@@ -106,6 +118,7 @@
         await playOpening();
 
         try {
+          await preloadFiles();
           const gameCode = await (await fetch("game.py")).text();
           await pyodide.runPythonAsync(gameCode);
         } catch (err) {
