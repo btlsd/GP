@@ -1,19 +1,29 @@
-import json
-import random
-import string
-import time
-from pathlib import Path
+"""
+Python implementation of the mini text adventure / combat game.
 
+The script is designed to run both in a normal Python interpreter and inside a
+web page through Pyodide.  To help future contributors understand the flow,
+the main sections below are heavily commented.
+"""
+
+import json        # JSON 파일을 읽고 쓰기 위한 표준 라이브러리
+import random      # 난수 생성을 위해 사용
+import string      # 문자열 관련 편의 기능 제공
+import time        # 지연 효과 등을 주기 위한 타이머
+from pathlib import Path  # 경로 처리를 객체지향적으로 다룸
+
+# Pyodide 환경에서는 브라우저와 상호작용하기 위한 모듈을 불러온다.
+# 일반 파이썬 환경에서는 import가 실패하므로 예외 처리 후 None으로 둔다.
 try:
-    import js
-    from browser import write
+    import js  # 브라우저의 window 객체에 접근
+    from browser import write  # HTML에 직접 출력하는 함수
 except Exception:  # Fallback when running outside Pyodide
     js = None
     write = None
 
 
 def print(*args, sep=" ", end="\n", **kwargs):
-    """Custom print that works with or without the browser module."""
+    """브라우저 환경 여부에 따라 적절한 출력 방식을 선택하는 print 함수."""
     text = sep.join(map(str, args)) + end
     if write:
         write(text)
@@ -22,15 +32,17 @@ def print(*args, sep=" ", end="\n", **kwargs):
 
 
 def input(prompt: str = "") -> str:
-    """Prompt the user, falling back to standard input if needed."""
+    """브라우저에서 입력을 받거나, 일반 환경에서는 표준 입력을 사용한다."""
     if js and hasattr(js, "prompt"):
         return js.prompt(prompt) or ""
     return __builtins__.input(prompt)
 
+# 현재 스크립트가 위치한 경로. Pyodide와 로컬 환경 모두에서 안전하게 계산된다.
 BASE_PATH = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
 
 
 def _load_json(filename: str):
+    """지정된 JSON 파일을 읽어 파이썬 객체로 반환한다."""
     path = BASE_PATH / filename
     try:
         with open(path, encoding="utf-8") as f:
@@ -40,57 +52,63 @@ def _load_json(filename: str):
 
 
 def _save_json(filename: str, data):
+    """파이썬 객체를 JSON 파일로 저장한다."""
     path = BASE_PATH / filename
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# Load configurable text and lists
-CONFIG = _load_json("config.json")
-
-# Load combat actions
-ACTIONS = _load_json("actions.json")
-
-# Load tutorial script
-TUTORIAL = _load_json("tutorial.json")
-
-# Load starting player template
-PLAYER_TEMPLATE = _load_json("player.json")
+# 아래의 JSON 파일들은 게임에서 사용되는 기본 데이터와 문구를 정의한다.
+CONFIG = _load_json("config.json")        # 각종 위치/전투 메시지 등 설정
+ACTIONS = _load_json("actions.json")      # 플레이어 행동 목록
+TUTORIAL = _load_json("tutorial.json")    # 튜토리얼 진행 스크립트
+PLAYER_TEMPLATE = _load_json("player.json")  # 새 플레이어의 기본 상태
 
 def generate_code_name():
+    """랜덤한 코드네임을 생성한다. 예: AB-12"""
     letters = random.choice(string.ascii_uppercase) + random.choice(string.ascii_uppercase)
     numbers = f"{random.randint(0,99):02d}"
     return f"{letters}-{numbers}"
 
 class Item:
+    """플레이어가 소지할 수 있는 장비/아이템을 표현한다."""
+
     def __init__(self, name, attack_bonus=0, defense_bonus=0):
         self.name = name
         self.attack_bonus = attack_bonus
         self.defense_bonus = defense_bonus
 
 class Player:
+    """게임의 주인공을 나타내는 클래스."""
+
     def __init__(self, state):
+        # 저장된 상태에서 캐릭터를 불러오거나 새로 생성한다.
         self.name = state.get("name") or generate_code_name()
         stats = state.get("stats", {})
         self.hp = stats.get("hp", 100)
         self.base_attack = stats.get("base_attack", 10)
         self.defense = stats.get("defense", 5)
+        # 인벤토리의 각 아이템을 Item 객체로 변환
         self.inventory = [
             Item(i["name"], i.get("attack_bonus", 0), i.get("defense_bonus", 0))
             for i in state.get("inventory", [])
         ]
+        # 장착 중인 무기 정보
         weapon_name = state.get("equipment", {}).get("weapon")
         self.weapon = next(
             (item for item in self.inventory if item.name == weapon_name), None
         )
+        # 진행 중/완료한 미션 정보
         self.missions = state.get("missions", {})
 
     @property
     def attack(self):
+        """장착 무기의 공격력을 합산한 실제 공격력."""
         bonus = self.weapon.attack_bonus if self.weapon else 0
         return self.base_attack + bonus
 
     def to_dict(self):
+        """현재 플레이어 상태를 저장 가능한 dict로 변환한다."""
         return {
             "name": self.name,
             "stats": {
@@ -111,6 +129,8 @@ class Player:
         }
 
 class Enemy:
+    """전투에서 상대할 적 캐릭터."""
+
     def __init__(self, name, hp, attack, defense, description=""):
         self.name = name
         self.hp = hp
@@ -120,10 +140,12 @@ class Enemy:
 
 
 def save_game(player, filename: str = "save.json"):
+    """플레이어 상태를 JSON 파일로 저장."""
     _save_json(filename, player.to_dict())
 
 
 def check_conditions(player, conditions):
+    """행동/카테고리 표시 조건을 검사한다."""
     for key, value in conditions.items():
         if key == "weapon":
             if value is True and not player.weapon:
@@ -143,6 +165,7 @@ def check_conditions(player, conditions):
 
 
 def get_available_actions(player):
+    """플레이어 상태에 맞는 행동 목록을 만들어 반환한다."""
     available = []
     for cat in ACTIONS:
         if not check_conditions(player, cat.get("conditions", {})):
@@ -159,6 +182,7 @@ def get_available_actions(player):
 
 
 def show_location(key: str, npcs_override=None, actions_override=None):
+    """위치 설명과 NPC/행동 목록을 화면에 출력한다."""
     loc = CONFIG["locations"][key]
     print(f"\n{loc['description']}")
     npcs = npcs_override if npcs_override is not None else loc.get("npcs", [])
@@ -174,6 +198,7 @@ def show_location(key: str, npcs_override=None, actions_override=None):
         print(f"{idx}. {action}")
 
 def equip_menu(player):
+    """무기를 장착하거나 변경하는 메뉴."""
     menu = CONFIG["equipment_menu"]
     print(f"\n{menu['title']}")
     for idx, item in enumerate(player.inventory, 1):
@@ -192,6 +217,7 @@ def equip_menu(player):
         print(menu["cancel"])
 
 def turn_based_combat(player, enemy):
+    """플레이어와 적 사이의 턴제 전투 루프."""
     cfg = CONFIG["combat"]
     enemy_name = enemy.name or cfg["unknown"]
     print(f"\n{cfg['start_text'].format(enemy=enemy_name)}")
@@ -269,6 +295,7 @@ def turn_based_combat(player, enemy):
     save_game(player)
 
 def mission_office(demo: bool = False):
+    """임무 수행 여부를 묻는 로비 화면."""
     loc = CONFIG["locations"]["mission_office"]
     show_location("mission_office")
     time.sleep(0.5)
@@ -285,6 +312,7 @@ def mission_office(demo: bool = False):
 
 
 def start_menu():
+    """게임 시작 시 표시되는 메인 메뉴."""
     while True:
         print("1. 새 게임")
         print("2. 불러오기")
@@ -304,17 +332,18 @@ def start_menu():
         print(CONFIG["combat"]["player_invalid"])
 
 def training_session(player):
+    """튜토리얼 전투 및 장비 사용을 안내하는 섹션."""
     tut = TUTORIAL
     stick_cfg = tut.get("stick_item", {})
     stick = Item(
-        stick_cfg.get("name", "막대기"),
+        stick_cfg.get("name", "막대"),
         attack_bonus=stick_cfg.get("attack_bonus", 0),
         defense_bonus=stick_cfg.get("defense_bonus", 0),
     )
 
     steps = tut.get("steps", [])
 
-    # Step 0: stick pickup
+    # Step 0: 막대를 줍게 하는 단계
     step = steps[0]
     while True:
         show_location("training_ground", actions_override=step.get("actions", []))
@@ -330,7 +359,7 @@ def training_session(player):
         else:
             print(CONFIG["combat"]["player_invalid"])
 
-    # Step 1: choose instructor or menu
+    # Step 1: 교관과 대화하거나 장비 메뉴로 이동
     step = steps[1]
     while True:
         show_location("training_ground", actions_override=step.get("actions", []))
@@ -346,7 +375,7 @@ def training_session(player):
         else:
             print(CONFIG["combat"]["player_invalid"])
 
-    # Step 2: interaction (combat or menu)
+    # Step 2: 전투를 진행하거나 다시 메뉴로 이동
     step = steps[2]
     while True:
         show_location("training_ground", actions_override=step.get("actions", []))
@@ -360,7 +389,7 @@ def training_session(player):
         else:
             print(CONFIG["combat"]["player_invalid"])
 
-    # Step 3: conclude tutorial
+    # Step 3: 튜토리얼 종료
     if player.hp > 0 and len(steps) > 3:
         step = steps[3]
         if step.get("line"):
@@ -370,6 +399,7 @@ def training_session(player):
     save_game(player)
 
 def main():
+    """게임의 진입점. 전체 흐름을 제어한다."""
     player, is_new = start_menu()
     misc = CONFIG["misc"]
     print(misc["code_name"].format(name=player.name))
