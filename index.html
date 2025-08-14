@@ -16,25 +16,34 @@
   <button id="start">게임 시작</button>
 
   <script type="module">
+    <!--
+      Pyodide 모듈을 불러와 브라우저에서 Python 코드를 실행하고
+      텍스트 기반 게임을 구동하는 스크립트이다.
+    -->
     import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.mjs";
 
+    // 출력 영역과 시작 버튼 요소 참조
     const output = document.getElementById("output");
     const startBtn = document.getElementById("start");
-    let pyodide = null;
-    let htmlBuffer = "";
+    let pyodide = null;   // Pyodide 인스턴스 저장
+    let htmlBuffer = "";  // 출력 내용을 누적하여 표시
 
+    // 에러 객체를 사람이 읽기 쉬운 문자열로 변환
     function formatError(err) {
       const code = err?.code || err?.name || "UnknownError";
       const message = err?.message || err;
       return `[${code}] ${message}`;
     }
 
+    // 일정 시간(ms) 대기
     function sleep(ms) {
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
+    // 강조할 고유명사 목록
     const properNouns = { "군포": "proper-noun" };
 
+    // 문자열 내의 특정 단어를 색상으로 강조
     function colorProperNouns(text) {
       for (const [word, cls] of Object.entries(properNouns)) {
         const spanRegex = new RegExp(`<span class="${cls}">(.*?)<\/span>`, "g");
@@ -45,6 +54,7 @@
       return text;
     }
 
+    // 브라우저에서 HTML을 안전하게 출력하기 위한 이스케이프 함수
     function escapeHtml(str) {
       return str
         .replace(/&/g, "&amp;")
@@ -52,6 +62,7 @@
         .replace(/>/g, "&gt;");
     }
 
+    // 한 줄의 텍스트를 타자 치듯이 출력
     async function typeLine(line) {
       for (const ch of line) {
         htmlBuffer += ch;
@@ -64,6 +75,30 @@
       output.scrollTop = output.scrollHeight;
     }
 
+    // Python의 print 출력을 오프닝과 동일하게 표시하기 위한 대기열
+    const printQueue = [];
+    let printing = false;
+
+    async function processPrintQueue() {
+      if (printing) return; // 이미 처리 중이면 중복 실행 방지
+      printing = true;
+      while (printQueue.length > 0) {
+        const text = printQueue.shift();
+        const lines = text.split(/\n/);
+        for (const line of lines) {
+          if (line) {
+            await typeLine(line);
+          } else {
+            htmlBuffer += "<br>";
+            output.innerHTML = colorProperNouns(htmlBuffer);
+            output.scrollTop = output.scrollHeight;
+          }
+        }
+      }
+      printing = false;
+    }
+
+    // 오프닝 텍스트를 순차적으로 출력
     async function playOpening() {
       try {
         const res = await fetch("opening.json");
@@ -78,6 +113,7 @@
     }
   }
 
+  // Pyodide 파일 시스템에 필요한 JSON 파일들을 미리 로드
   async function preloadFiles() {
     const files = ["config.json", "actions.json", "tutorial.json", "player.json", "save.json"];
     for (const file of files) {
@@ -92,14 +128,15 @@
     }
   }
 
+  // Pyodide 초기화 및 브라우저에 출력 함수를 연결
   async function initPyodide() {
     try {
       pyodide = await loadPyodide();
       pyodide.registerJsModule("browser", {
           write: (text) => {
-            const escaped = escapeHtml(text).replace(/\n/g, "<br>");
-            output.innerHTML += colorProperNouns(escaped);
-            output.scrollTop = output.scrollHeight;
+            // Python에서 온 출력을 HTML로 안전하게 변환 후 큐에 추가
+            printQueue.push(escapeHtml(text));
+            processPrintQueue();
           }
         });
       } catch (err) {
@@ -109,6 +146,7 @@
     initPyodide();
 
 
+      // 시작 버튼을 눌렀을 때 게임 코드 실행
       startBtn.addEventListener("click", async () => {
         output.innerHTML = colorProperNouns("=== 군포 프로젝트 ===<br>");
         htmlBuffer = output.innerHTML;
@@ -123,9 +161,9 @@
         await playOpening();
 
         try {
-          await preloadFiles();
+          await preloadFiles();          // 게임에 필요한 데이터 로드
           const gameCode = await (await fetch("game.py")).text();
-          await pyodide.runPythonAsync(gameCode);
+          await pyodide.runPythonAsync(gameCode);  // Python 코드 실행
         } catch (err) {
           output.innerHTML += `<br>[에러 발생]<br>${formatError(err)}<br>`;
         }
