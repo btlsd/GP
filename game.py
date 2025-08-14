@@ -32,9 +32,19 @@ def print(*args, sep=" ", end="\n", **kwargs):
 
 
 def input(prompt: str = "") -> str:
-    """브라우저에서 입력을 받거나, 일반 환경에서는 표준 입력을 사용한다."""
+    """브라우저에서 입력을 받거나, 일반 환경에서는 표준 입력을 사용한다.
+
+    Pyodide 환경에서는 입력에 앞서 전달된 프롬프트를 HTML로 출력한 뒤
+    `window.prompt`를 통해 값을 받아온다. 이렇게 하면 플레이어가 보아야 할
+    안내 문구가 브라우저 화면에 남기 때문에 전체 UI가 웹 상에 노출된다.
+    """
     if js and hasattr(js, "prompt"):
-        return js.prompt(prompt) or ""
+        if prompt:
+            print(prompt)  # 프롬프트 문구를 HTML 출력 영역에 표시
+        response = js.prompt("") or ""  # 실제 입력은 브라우저 기본 창에서 받는다
+        if response:
+            print(response)  # 플레이어가 입력한 값을 화면에 남겨 둔다
+        return response
     return __builtins__.input(prompt)
 
 # 현재 스크립트가 위치한 경로. Pyodide와 로컬 환경 모두에서 안전하게 계산된다.
