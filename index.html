@@ -56,10 +56,12 @@
       for (const ch of line) {
         htmlBuffer += ch;
         output.innerHTML = colorProperNouns(htmlBuffer);
+        output.scrollTop = output.scrollHeight;
         await sleep(50);
       }
       htmlBuffer += "<br>";
       output.innerHTML = colorProperNouns(htmlBuffer);
+      output.scrollTop = output.scrollHeight;
     }
 
     async function playOpening() {
@@ -97,6 +99,7 @@
           write: (text) => {
             const escaped = escapeHtml(text).replace(/\n/g, "<br>");
             output.innerHTML += colorProperNouns(escaped);
+            output.scrollTop = output.scrollHeight;
           }
         });
       } catch (err) {
